@@ -14,21 +14,22 @@ namespace bandpass {
     }
 
     float FrequencyResponseComponent::getMagnitude(const float frequency) const {
-        // 二阶带通模拟域：幅频响应
+        // Analog‑domain second‑order band‑pass magnitude‑frequency response
         // H(s) = (ω0/Q * s) / (s² + ω0/Q * s + ω0²)
-        // 对复数分式：H = Z1/Z2，H的模等于：|H| = |Z1|/|Z2|，即分子的模除以分母的模
-        // |H(jω)| = (ω0/Q * ω) / sqrt((ω0² - ω²)² + (ω0/Q * ω)²)
+        // For complex fraction H = Z1/Z2: magnitude |H| = |Z1| / |Z2| (
+        // magnitude of numerator divided by magnitude of denominator)
+        // |H(jω)| = (ω0/Q * ω) / sqrt((ω0² − ω²)² + (ω0/Q * ω)²)
 
-        // 中心角频率 ω0 = 2π·f_center
+        // Center angular frequency ω0 = 2π·f_center
         const auto omega0 = juce::MathConstants<float>::twoPi * freqCenter;
-        // 当前采样点角频率 ω = 2π·frequency
+        // Angular frequency for current evaluation point ω = 2π·frequency
         const auto omega = juce::MathConstants<float>::twoPi * frequency;
-        // 角频率带宽 BW = ω0 / Q
+        // Angular bandwidth BW = ω0 / Q
         const auto bw = omega0 / q;
 
-        // 分子：bw * ω
+        // Numerator term: bw * ω
         const auto numerator = bw * omega;
-        // 分母：sqrt( (ω0²−ω²)² + (bw·ω)² )
+        // Denominator term: sqrt( (ω0²−ω²)² + (bw·ω)² )
         const auto denominator = std::sqrt(std::pow(omega0 * omega0 - omega * omega, 2.0f)
                                         + std::pow(bw * omega, 2.0f));
 
@@ -45,28 +46,28 @@ namespace bandpass {
         const auto padRight = 20.f;
         const auto padTop = 30.f;
         const auto padBottom = 35.f;
-        // plotW：画布宽度，plot 是MATLAB的二维线图函数
+        // plotW: width of plotting area
         const auto plotW = w - padLeft - padRight;
-        // plotH：画布高度
+        // plotH: height of plotting area
         const auto plotH = h - padTop - padBottom;
 
-        // --- 背景半透明面板 ---
+        // --- Semi‑transparent background panel ---
         g.setColour(juce::Colour(0x33000000));
         g.fillRoundedRectangle(padLeft - 10, padTop - 10, plotW + 20, plotH + 20, 6.0f);
 
-        // --- 网络线 ---
+        // --- Grid lines ---
         g.setColour(juce::Colour(0x22ffffff));
-        // 水平网格（3条）
+        // Horizontal grid lines (total 3 lines)
         for (int i = 0; i < 3; ++i) {
             const auto gy = padTop + plotH * i / 3.0f;
             g.drawHorizontalLine(static_cast<int>(gy), padLeft, padLeft + plotW);
         }
-        // 垂直网格（5条）
+        // Vertical grid lines (total 5 lines)
         for (int i = 0; i < 5; ++i) {
             const auto gx = padLeft + plotW * i / 5.0f;
             g.drawVerticalLine(static_cast<int>(gx), padTop, padTop + plotH);
         }
-        // --- 坐标轴标签 ---
+        // --- Axis labels ---
         g.setColour(juce::Colour(0xffaaaaaa));
         g.setFont(BandpassLookAndFeel::getAxisFont());
         g.drawText(
@@ -77,62 +78,72 @@ namespace bandpass {
             20,
             juce::Justification::centred);
 
-        // --- 绘制频响曲线 ---
-        juce::Path curvePath;   // 存储频响轮廓线，用来strokePath描边画线
-        juce::Path fillPath;    // 存储“曲线+底边闭合”的封闭多边形，用来fillPath填充颜色
+        // --- Draw frequency‑response curve ---
+
+        // Stores frequency‑response outline path, used for strokePath outline drawing
+        juce::Path curvePath;
+        // Stores closed polygon: curve + bottom boundary,
+        // used for fillPath solid‑color filling
+        juce::Path fillPath;
 
         constexpr auto minFreq = Bandpass::minFreqCenter;
-        const auto maxFreq = sampleRate * 0.5f;     // 奈奎斯特频率
+        const auto maxFreq = sampleRate * 0.5f;     // Nyquist frequency
 
         constexpr int numPoints = 200;
-        // 注意：必须是小于等于符号，这是为了让t的最大值是1，这样才能取到奈奎斯特点
-        // 即实际是201个采样点
+        // Note: Must use <= condition, to make t reach 1.0
+        // so we sample the Nyquist frequency point
+        // This loop actually generates 201 evaluation samples
         for (int i = 0; i <= numPoints; ++i) {
-            // t：归一化横坐标，范围[0.0, 1.0]
-            // i = 0 -> t = 0.0：对应最左侧20Hz
-            // i = 200 -> t = 1.0：对应最右侧，奈奎斯特频率
+            // t: normalized horizontal coordinate, range [0.0, 1.0]
+            // i = 0  → t = 0.0: maps to leftmost frequency (20Hz)
+            // i = 200 → t = 1.0: maps to rightmost Nyquist frequency
             const auto t = static_cast<float>(i) / numPoints;
-            // 对数频率映射
-            // 公式推导：
+            // Logarithmic frequency mapping
+            // Formula derivation:
             // t=0 → freq = minFreq = 20Hz
-            // t=1 → freq = minFreq * (maxFreq/minFreq)^1 = maxFreq →奈奎斯特
+            // t=1 → freq = minFreq * (maxFreq/minFreq)^1 = maxFreq → Nyquist frequency
             const auto freq = minFreq * std::pow(maxFreq / minFreq, t);
             const auto mag = getMagnitude(freq);
 
-            // 把归一化的t∈[0,1]映射为画布像素 X 坐标：
-            // - t=0 → x=padLeft（最左边）
-            // - t=1 → x=padLeft+plotW（绘图区最右侧）
+            // Map normalized t ∈ [0,1] to canvas pixel X‑coordinate:
+            // t=0 → x=padLeft (left plotting boundary)
+            // t=1 → x=padLeft+plotW (right plotting boundary)
             const auto x = padLeft + plotW * t;
-            // 同样将mag∈[0,1]映射为画布像素 y 坐标：
+            // Map magnitude mag ∈ [0,1] to canvas pixel Y‑coordinate:
             const auto y =
-                // 1.f − mag：反转数值：顶部y值小，底部y值大
+                // 1.f − mag: invert value: higher gain → smaller Y value
+                // (towards screen top)
                 padTop + plotH * (1.f - juce::jlimit(0.f, 1.f, mag));
 
-            // 处理第一个点，最左侧的20Hz
+            // Process first sample point (leftmost, 20Hz)
             if (i == 0) {
-                // 从当前点开始绘制
+                // Start drawing path from current point
                 curvePath.startNewSubPath(x, y);
-                // 填充路径起点不是曲线上的点！是绘图区域左下角。
+                // Fill‑path starting point is NOT on response curve!
+                // It is bottom‑left corner of plotting area.
                 fillPath.startNewSubPath(x, padTop + plotH);
-                // 从左下角垂直向上走到曲线第一个采样点
+                // Draw vertical line upwards from bottom‑left to first curve sample point
                 fillPath.lineTo(x, y);
             }
-            // 处理其他点
+            // Process remaining sample points
             else {
-                // 轮廓线从上一个点连线到当前`(x,y)`，把所有频响采样点连成一条连续曲线。
+                // Connect previous point to current (x,y),
+                // assemble continuous frequency‑response polyline
                 curvePath.lineTo(x, y);
-                // 填充多边形沿着频响曲线，不断记录每个曲线上的点
+                // Append each curve sample point to fill polygon path
                 fillPath.lineTo(x, y);
             }
         }
-        // 闭合填充路径
-        // 从曲线的最右端点，垂直向下走到绘图区域右下角。
+        // Close fill polygon path
+        // From right‑most curve point,
+        // draw vertical line down to bottom‑right plotting corner
         fillPath.lineTo(padLeft + plotW, padTop + plotH);   // 右下角
-        // 自动把【右下角】连回路径起点【绘图左下角】
+        // Automatically connect bottom‑right corner
+        // back to fill‑path starting bottom‑left corner
         fillPath.closeSubPath();
-        // 至此，fillPath 形成一个完整封闭多边形
+        // fillPath now forms a fully‑closed polygon shape
 
-        // --- 曲线下方渐变填充 ---
+        // --- Gradient fill area below response curve ---
         juce::ColourGradient fillGrad(
             juce::Colour(0x4400aaff),
             0, padTop,
@@ -142,27 +153,28 @@ namespace bandpass {
         g.setGradientFill(fillGrad);
         g.fillPath(fillPath);
 
-        // --- 曲线发光效果（外层粗半透明） ---
+        // --- Outer glow effect: thick semi‑transparent stroke ---
         g.setColour(juce::Colour(0x3300ccff));
         g.strokePath(curvePath, juce::PathStrokeType(6.0f));
 
-        // --- 曲线核心（亮蓝色细线）---
+        // --- Main sharp curve core: bright‑blue thin line ---
         g.setColour(juce::Colour(0xff00ccff));
         g.strokePath(curvePath, juce::PathStrokeType(2.0f));
 
-        // --- 峰值点标注 ---
-        // 已知真实频率 `freqCenter`，反推它在画布上的归一化横坐标 t_peak，再换算成像素 peakX
-        // 和上面的计算freq 正好是逆运算
+        // --- Peak‑point annotation ---
+        // Given physical frequency freqCenter,
+        // compute inverse mapping to get normalized t_peak, then pixel peakX
+        // This is inverse operation of the frequency‑to‑t calculation above
         const auto peakX = padLeft + plotW * (std::log(freqCenter / minFreq) / std::log(maxFreq / minFreq));
-        const auto peakY = padTop + plotH * (1.f - 1.f);  // 峰值 mag = 1，在顶部
+        const auto peakY = padTop + plotH * (1.f - 1.f); // Peak magnitude mag = 1, located at plot top
 
-        // 峰值圆点
+        // Peak marker filled circle
         g.setColour(juce::Colour(0xffffffff));
         g.fillEllipse(peakX - 5.0f, peakY - 5.0f, 10.0f, 10.0f);
         g.setColour(juce::Colour(0x4400aaff));
         g.fillEllipse(peakX - 9.f, peakY - 9.f, 18.0f, 18.0f);
 
-        // 峰值频率文字
+        // Peak‑frequency text label
         g.setColour(juce::Colour(0xffffffff));
         g.setFont(BandpassLookAndFeel::getPeakFont());
         juce::String peakText;
@@ -181,7 +193,7 @@ namespace bandpass {
             juce::Justification::centred,
             false);
 
-        // 峰值垂直虚线
+        // Vertical dashed indicator line for peak
         g.setColour(juce::Colour(0x44ffffff));
         constexpr float dashLengths[2] = {4.0f, 4.0f};
         g.drawDashedLine(

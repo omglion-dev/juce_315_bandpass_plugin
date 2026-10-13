@@ -7,7 +7,7 @@ namespace bandpass {
     }
 
     const juce::String PluginProcessor::getName() const {
-        // JUCE_315_PLUGIN_NAME 在 CMakeLists.txt 中定义
+        // JUCE_315_PLUGIN_NAME is defined in CMakeLists.txt
         return JUCE_315_PLUGIN_NAME;
     }
 
@@ -51,13 +51,14 @@ namespace bandpass {
         juce::ignoreUnused(index, newName);
     }
 
-    // 宿主通过调用 prepareToPlay() 方法，将采样率告知插件；
-    // 同时还会传入预期的最大块大小，相当于宿主告知插件：「我传入的音频缓冲区，帧数不会超过这个数值」。
-    // 插件应当基于这两个信息，预先分配好音频处理所需的全部缓冲区内存。
+    // Host calls prepareToPlay() to inform plugin of sample‑rate;
+    // also passes expected maximum block‑size.
+    // Host guarantees audio‑buffer frame count will not exceed this value.
+    // Plugin shall pre‑allocate all required audio‑processing memory based on these two values.
     void PluginProcessor::prepareToPlay(double sampleRate,
                                         int expectedMaxFramesPerBlock) {
-        // 之所以获取总输入通道的数量，而不是总输出通道的数量，
-        // 是为了避免出现输出通道数量超过输入通道数量的情况
+        // Read total input‑channel count instead of output‑channel count,
+        // to avoid issues when output‑channel count exceeds input‑channel count
         bandpass.prepare(
             sampleRate,
             expectedMaxFramesPerBlock,
@@ -90,11 +91,11 @@ namespace bandpass {
 
     void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                                        juce::MidiBuffer &midiMessages) {
-        // 处理器在 processBlock()
-        // 中的核心任务就是处理输入采样。但实时音频信号处理的特性，
-        // 对该方法的执行时长有严格约束：简单来说，
-        // processBlock() 的执行耗时必须短于它所处理的音频缓冲区对应的时长，
-        // 无法按时完成会导致严重的后果。
+        // Core audio‑sample processing happens in processBlock().
+        // Real‑time audio processing imposes strict execution‑time constraints:
+        // processBlock() must finish execution faster than
+        // the time‑duration represented by the audio buffer.
+        // Exceeding time budget will cause audio drop‑outs.
 
         juce::ignoreUnused(midiMessages);
 
@@ -108,10 +109,6 @@ namespace bandpass {
         // This is here to avoid people getting screaming feedback
         // when they first compile a plugin, but obviously you don't need to keep
         // this code if your algorithm always overwrites all the output channels.
-        // 如果输出通道数量多于输入通道，这段代码会清空所有未承载输入数据的输出
-        // 通道（因为这些通道不一定是空的，可能存有无效垃圾数据）。
-        // 添加这段代码是为了避免用户在首次编译插件时听到刺耳的反馈噪音。
-        // 但如果你的算法会覆盖全部输出通道，那么显然就不需要保留这段代码。
         for (const auto channelToClear:
              std::views::iota(totalNumInputChannels, totalNumOutputChannels)) {
             buffer.clear(channelToClear, 0, buffer.getNumSamples());
@@ -121,6 +118,7 @@ namespace bandpass {
         bandpass.setFreqCenter(parameters.freqCenter.get());
         bandpass.setQ(parameters.q.get());
 
+        // apply bandpss
         bandpass.process(buffer);
     }
 
@@ -134,38 +132,40 @@ namespace bandpass {
     }
 
     /**
-     * @brief DAW宿主保存【工程】时自动回调，序列化输出插件全部参数状态
-     * @param destData 宿主提供可扩容内存块，所有序列化JSON数据将写入此容器
-     * @details 1. 创建绑定destData的内存输出流，true代表追加写入模式
-     *          2. 调用JsonSerializer将当前插件参数序列化为JSON文本写入内存块
-     * @note 宿主持有destData内存，函数执行完毕后会将二进制存入工程文件持久化；
-     *       所有需要持久化的配置必须在此写入destData，否则重启丢失
+     * @brief Automatically invoked when DAW saves project;
+     * serializes all plugin parameter states
+     * @param destData Expandable memory‑block provided by host;
+     * serialized JSON data will be written here
+     * @details 1. Create memory output stream bound to destData, true enables append‑mode
+     *          2. Serialize plugin parameters to JSON text and write into memory‑block
+     * @note Host owns destData memory; binary content is persisted
+     *       inside project file after return.
+     *       All persistable settings must be written to destData,
+     *       otherwise values are lost after reload.
      */
     void PluginProcessor::getStateInformation(juce::MemoryBlock &destData) {
-        // juce::MemoryOutputStream memoryOutputStream{destData, true};
-        // JsonSerializer::serialize(parameters, memoryOutputStream);
+        // You should use this method to store your parameters in the memory block.
+        // You could do that either as raw data, or use the XML or ValueTree classes
+        // as intermediaries to make it easy to save and load complex data.
         juce::ignoreUnused(destData);
     }
 
     /**
-     * @brief DAW加载【工程】/载入预设时自动回调，从宿主内存反序列化恢复插件参数
-     * @param data 宿主传入只读原始二进制内存指针，存储之前序列化的JSON字节
-     * @param sizeInBytes 内存块总字节长度，用于限定读取边界
-     * @details 1. 基于只读内存创建输入流，false表示不拷贝内存节省开销
-     *          2. 执行JSON反序列化，将存档数值回填插件Parameters参数容器
-     *          3. 解析失败时通过DBG打印错误日志（仅Debug构建生效，Release自动移除）
-     *          4. 强制同步旁路平滑器，禁用渐变过渡，避免加载时音频爆音
-     * @warning 1. data为const只读，不可修改、扩容、释放该内存
-     *          2. 所有带参数平滑器加载状态后都应调用setBypassForced强制刷新
-     *          3. DBG仅用于开发调试，切勿写入业务逻辑到宏内部
+     * @brief Automatically invoked when DAW loads project / preset; restore plugin parameters from serialized binary data
+     * @param data Read‑only raw binary pointer supplied by host, holds previously serialized JSON bytes
+     * @param sizeInBytes Total byte‑length of memory‑block, used for read‑boundary checking
+     * @details 1. Construct input‑stream over read‑only memory; false avoids copying memory for performance
+     *          2. Execute JSON deserialization and write restored values back to plugin parameter container
+     *          3. Print debug error log on parse failure (only active in Debug build; stripped for Release)
+     *          4. Force‑sync smoothers and disable ramping transition to avoid audio clicks on project‑load
+     * @warning 1. data pointer is const read‑only; do not modify, expand or free this memory region
+     *          2. After loading state, all parameter smoothers should be forced‑refreshed
+     *          3. DBG macro is for debugging only; never place business logic inside DBG blocks
      */
     void PluginProcessor::setStateInformation(const void *data, int sizeInBytes) {
-        // juce::MemoryInputStream memoryInputStream{data, static_cast<size_t>(sizeInBytes), false};
-        //
-        // if (const auto result = JsonSerializer::deserialize(memoryInputStream, parameters); result.failed()) {
-        //     DBG(result.getErrorMessage());
-        // }
-        // bypassTransitionSmoother.setBypassForced(parameters.bypassed.get());
+        // You should use this method to restore your parameters from this memory
+        // block, whose contents will have been created by the getStateInformation()
+        // call.
         juce::ignoreUnused(data, sizeInBytes);
     }
 
@@ -177,19 +177,10 @@ namespace bandpass {
         return bandpass;
     }
 
-    // juce::AudioProcessorParameter *PluginProcessor::getBypassParameter() const {
-    //     return &parameters.bypassed;
-    // }
-
-    // double PluginProcessor::getSampleRateThreadSafe() const noexcept {
-    //     return currentSampleRate;
-    // }
-
-    // void PluginProcessor::readAllLfoSamples(juce::AudioBuffer<float> &bufferToFill) {
-    //     tremolo.readAllLfoSamples(bufferToFill);
-    // }
 }
 
+// This creates new instances of the plugin.
+// This function definition must be in the global namespace.
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     return new bandpass::PluginProcessor();
 }

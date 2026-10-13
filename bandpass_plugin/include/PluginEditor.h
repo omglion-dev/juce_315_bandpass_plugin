@@ -3,9 +3,6 @@
 #include "FrequencyResponseComponent.h"
 
 namespace bandpass {
-    // ============================================================
-    // 自定义 LookAndFeel：实现设计图中的蓝色发光水平滑块
-    // ============================================================
     class PluginEditor
         : public juce::AudioProcessorEditor,
           public juce::Slider::Listener {
@@ -19,24 +16,24 @@ namespace bandpass {
     private:
         PluginProcessor& processor;
 
-        // 自定义外观
+        // Custom UI styling instance
         BandpassLookAndFeel lookAndFeel;
 
-        // 频响曲线
+        // Frequency‑response plot component
         FrequencyResponseComponent responseComponent;
 
-        // slider 滑块
+        // UI slider controls
         juce::Slider freqSlider {"Frequency Center"};
         juce::Slider qSlider {"Q Factor"};
 
-        // 标签
+        // Text label widgets
         juce::Label titleLabel {"title", "OMG-BP"};
         juce::Label activeLabel {"active", "ACTIVE"};
         juce::Label statusLabel {"status", ""};
         juce::Label freqLabel {"freq", "Frequency Center"};
         juce::Label qLabel {"q", "Q Factor"};
 
-        // 根据滑块当前值更新频响曲线和数值标签
+        // Refresh frequency‑response plot and status labels from current slider values
         void updateDisplay();
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor);

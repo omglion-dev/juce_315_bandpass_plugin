@@ -45,19 +45,14 @@ namespace bandpass {
 
         void setStateInformation(const void *data, int sizeInBytes) override;
 
-        // juce::AudioProcessorParameter* getBypassParameter() const override;
 
         Parameters& getParameterRefs() noexcept;
         Bandpass& getBandpassRef() noexcept;
 
-        // void readAllLfoSamples(juce::AudioBuffer<float>& bufferToFill);
-
-        /** @brief 以线程安全的方式获取处理器接收到的最新采样率 */
-        // double getSampleRateThreadSafe() const noexcept;
 
     private:
         Bandpass bandpass;
-        Parameters parameters {*this}; // 对 this指针解引用
+        Parameters parameters {*this};
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
     };

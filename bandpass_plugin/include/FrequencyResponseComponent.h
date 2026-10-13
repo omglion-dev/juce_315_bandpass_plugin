@@ -2,7 +2,8 @@
 
 namespace bandpass {
     // ============================================================
-    // 频响曲线显示组件：根据当前 fc / Q 实时绘制带通响应
+    // Frequency‑response plot component:
+    // draws real‑time band‑pass response using current fc / Q values
     // ============================================================
     class FrequencyResponseComponent : public juce::Component {
     public:
@@ -10,7 +11,7 @@ namespace bandpass {
 
         void paint(juce::Graphics &g) override;
 
-        // 更新参数并触发重绘
+        // Update internal parameters and trigger component repaint
         void setParameter(float freqCenter, float q, float sampleRate);
 
     private:
@@ -18,7 +19,8 @@ namespace bandpass {
         float q = Bandpass::defaultQ;
         float sampleRate = Bandpass::defaultSampleRate;
 
-        // 计算带通滤波器在给定频率处的幅度（归一化：0~1）
+        // Compute normalized magnitude (range: 0‑1) of
+        // band‑pass filter at given frequency
         float getMagnitude(const float frequency) const;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FrequencyResponseComponent)

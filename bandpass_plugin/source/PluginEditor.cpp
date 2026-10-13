@@ -1,4 +1,3 @@
-// #include "juce_gui_basics/widgets/juce_Slider.h"
 #include <juce_graphics/juce_graphics.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../include/PluginProcessor.h"
@@ -10,29 +9,29 @@ namespace bandpass {
         : juce::AudioProcessorEditor(processorRef),
           processor(processorRef)
     {
-        // 设置自定义LookAndFeel
+        // Assign custom LookAndFeel styling
         setLookAndFeel(&lookAndFeel);
 
-        // --- 标题 ---
+        // --- Title text label ---
         titleLabel.setFont(BandpassLookAndFeel::getTitleFont());
         titleLabel.setColour(
             juce::Label::textColourId,
             BandpassLookAndFeel::getDefaultColour(BandpassLookAndFeel::Colors::titleLabelColor));
         addAndMakeVisible(titleLabel);
 
-        // --- Active 指示灯 ---
+        // --- Active status indicator label ---
         activeLabel.setFont(BandpassLookAndFeel::getActiveLabelFont());
         activeLabel.setColour(
             juce::Label::textColourId,
             BandpassLookAndFeel::getDefaultColour(BandpassLookAndFeel::Colors::activeLabelColor));
         addAndMakeVisible(activeLabel);
 
-        // --- 频响曲线组件 ---
+        // --- Frequency‑response plot component ---
         addAndMakeVisible(responseComponent);
 
         freqLabel.setFont(BandpassLookAndFeel::getFreqAndQLabelFont());
         addAndMakeVisible(freqLabel);
-        // --- Frequency Center 滑块
+        // --- Frequency‑Center slider control ---
         freqSlider.setSliderStyle(juce::Slider::SliderStyle::LinearHorizontal);
         freqSlider.setTextBoxStyle(
             juce::Slider::TextBoxRight,
@@ -52,7 +51,7 @@ namespace bandpass {
 
         qLabel.setFont(BandpassLookAndFeel::getFreqAndQLabelFont());
         addAndMakeVisible(qLabel);
-        // --- Q Factor 滑块 ---
+        // --- Q‑Factor slider control ---
         qSlider.setSliderStyle(juce::Slider::SliderStyle::LinearHorizontal);
         qSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 80, 24);
         qSlider.setRange(Bandpass::minQ, Bandpass::maxQ, 0.1f);
@@ -62,17 +61,17 @@ namespace bandpass {
         qSlider.addListener(this);
         addAndMakeVisible(qSlider);
 
-        // --- 底部状态栏 ---
+        // --- Bottom status bar label ---
         statusLabel.setFont(BandpassLookAndFeel::getStatusLabelFont());
         statusLabel.setColour(
             juce::Label::textColourId,
             BandpassLookAndFeel::getDefaultColour(BandpassLookAndFeel::Colors::statusLabelTextColor));
         addAndMakeVisible(statusLabel);
 
-        // 设置编辑器大小
+        // Set overall editor window size
         setSize(820, 520);
 
-        // 初始化显示
+        // Initialize UI display state
         updateDisplay();
     }
 
@@ -84,7 +83,7 @@ namespace bandpass {
         const auto w = static_cast<float>(getWidth());
         const auto h = static_cast<float>(getHeight());
 
-        // --- 背景：深色镜像渐变（模拟碳纤维质感）---
+        // --- Background: dark vertical gradient, simulating carbon‑fiber panel look ---
         juce::ColourGradient bgGrad(
             juce::Colour(0xff2a2a2a),
             w * 0.5f, h * 0.3f,
@@ -94,7 +93,7 @@ namespace bandpass {
         g.setGradientFill(bgGrad);
         g.fillAll();
 
-        // --- 细微的斜纹纹理（模拟碳纤维）---
+        // --- Fine diagonal hatch pattern for carbon‑fiber visual effect ---
         g.setColour(juce::Colour(0x80000000));
         for (float i = -h; i < w + h; i += 6) {
             g.drawLine(
@@ -103,14 +102,14 @@ namespace bandpass {
                 1.0f);
         }
 
-        // --- 顶部标题栏分隔线 ---
+        // --- Top title‑area dividing separator line ---
         g.setColour(juce::Colour(0x33ffffff));
         g.drawHorizontalLine(55, 15, w - 15);
 
-        // --- 底部控制区分隔线 ---
+        // --- Bottom control‑panel dividing separator line ---
         g.drawHorizontalLine(static_cast<int>(h * 0.68f), 15, w - 15);
 
-        // --- 四个角的螺丝装饰 ---
+        // --- Corner screw decorative circles at four panel corners ---
         g.setColour(juce::Colour(0xff444444));
         const auto screwR = 5.0f;
         g.fillEllipse(
@@ -135,6 +134,7 @@ namespace bandpass {
             screwR * 2);
 
         // 螺丝内部十字
+        // Draw cross‑shaped indent inside each screw head
         g.setColour(juce::Colour(0xff222222));
         for (auto& sx : {15.0f, w - 15.0f}) {
             for (auto& sy : {15.0f, h - 15.0f}) {
@@ -143,19 +143,20 @@ namespace bandpass {
             }
         }
 
-        // --- Active 指示灯（红绿蓝三色圆点）---
+        // --- Active status LED indicator: red‑yellow‑green dot trio ---
         const auto ledX = w - 130.f;
         const auto ledY = 22.f;
-        // 红色
+        // Red indicator dot
         g.setColour(juce::Colour(0xffff4444));
         g.fillEllipse(ledX, ledY, 8, 8);
-        // 黄色
+        // Yellow indicator dot
         g.setColour(juce::Colour(0xffffcc00));
         g.fillEllipse(ledX + 12, ledY, 8, 8);
-        // 绿色（亮，表示 ACTIVE）
+        // Green dot: lit to signal plugin active state
         g.setColour(juce::Colour(0xff44ff44));
         g.fillEllipse(ledX + 24, ledY, 8, 8);
         // 绿色光晕
+        // Outer glow for green active LED
         juce::ColourGradient ledGlow(
             juce::Colour(0x6644ff44),
             ledX + 28, ledY + 4,
@@ -170,16 +171,16 @@ namespace bandpass {
         const auto w = getWidth();
         const auto h = getHeight();
 
-        // 标题
+        // Title label bounds
         titleLabel.setBounds(25, 12, 200, 35);
 
-        // ACTIVE 文字（在指示灯右侧）
+        // ACTIVE status text, placed to right of LED indicator
         activeLabel.setBounds(w - 95, 14, 80, 24);
 
-        // 频响曲线区域（中部）
+        // Middle plotting area for frequency‑response graph
         responseComponent.setBounds(15, 65, w - 30, static_cast<int>(h * 0.58f));
 
-        // 滑块区域（底部）
+        // Bottom slider control region
         const auto sliderY = static_cast<int>(h * 0.72f);
         constexpr auto sliderH = 40;
         freqLabel.setBounds(25, sliderY - 15, w - 700, 20);
@@ -187,15 +188,14 @@ namespace bandpass {
         qLabel.setBounds(25, sliderY + 40, w - 700, 20);
         qSlider.setBounds(30, sliderY + 55, w - 60, sliderH);
 
-        // 底部状态栏
+        // Bottom status information bar
         statusLabel.setBounds(20, h - 28, w - 40, 20);
     }
 
     void PluginEditor::sliderValueChanged(juce::Slider * slider) {
         if (slider == &freqSlider) {
-            // 同步到参数和DSP
+            // Sync UI slider value to audio‑processor parameter and DSP backend
             processor.getParameterRefs().freqCenter = static_cast<float>(freqSlider.getValue());
-            // processor.getBa
         }
         else if (slider == &qSlider) {
             processor.getParameterRefs().q = static_cast<float>(qSlider.getValue());
@@ -206,12 +206,12 @@ namespace bandpass {
     void PluginEditor::updateDisplay() {
         float sampleRate = processor.getBandpassRef().getSampleRate();
         sampleRate = sampleRate > 0 ? sampleRate : Bandpass::defaultSampleRate;
-        // 变更频响曲线
+        // Refresh frequency‑response plot component with latest values
         responseComponent.setParameter(
             static_cast<float>(freqSlider.getValue()),
             static_cast<float>(qSlider.getValue()),
             sampleRate);
-        // 更新状态栏
+        // Update bottom status‑bar text
         statusLabel.setText(
             "Sample Rate: " + juce::String(static_cast<int>(sampleRate)) + " Hz",
             juce::NotificationType::dontSendNotification);

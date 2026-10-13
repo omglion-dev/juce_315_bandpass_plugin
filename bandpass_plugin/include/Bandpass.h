@@ -12,74 +12,64 @@ namespace bandpass {
         static constexpr float defaultSampleRate = 44100.f;
 
         Bandpass() {
-            // 构造时初始化平滑器，防止 Multiplicative 初始值为 0（会导致 NaN）
+            // Initialize smoothers in constructor,
+            // avoid NaN caused by initial value 0 for Multiplicative smoother
             freqSmoother.setCurrentAndTargetValue(defaultFreqCenter);
             qSmoother.setCurrentAndTargetValue(defaultQ);
-
-            // 设置为带通模式
+            // Set filter mode to band‑pass
             bandPassFilter.setType(juce::dsp::StateVariableTPTFilterType::bandpass);
         }
 
         void prepare(const double sampleRate_, const int expectedMaxFramesPerBlock, const int numOutputChannels) {
-            // 保存采样率
+            // Store sample‑rate
             sampleRate = static_cast<float>(sampleRate_);
-
             const juce::dsp::ProcessSpec processSpec{
                 .sampleRate = sampleRate_,
                 .maximumBlockSize = static_cast<juce::uint32>(expectedMaxFramesPerBlock),
                 .numChannels = static_cast<juce::uint32>(numOutputChannels),
             };
-            // 准备滤波器，为每个声道创建独立的IIR实例
+            // Prepare filter, allocate independent IIR state for each audio channel
             bandPassFilter.prepare(processSpec);
-
-            // 设置平滑时间 25ms
+            // Set smoothing time to 25ms
             freqSmoother.reset(sampleRate, 0.025);
             qSmoother.reset(sampleRate, 0.025);
-
-            // 初始化滤波器默认参数：中心频率/截止频率、谐振/Q/品质因子
+            // Initialize filter with default center‑frequency and Q‑factor
             bandPassFilter.setCutoffFrequency(defaultFreqCenter);
             bandPassFilter.setResonance(defaultQ);
         }
 
         void process(juce::AudioBuffer<float> &buffer) {
-            // ============================================================
-            // 块级更新核心逻辑：
-            // 1. 取本块起始时刻的平滑值（整块复用这一组系数）
-            // 2. 调用 skip() 推进平滑器到本块结束位置（关键！不调则平滑器不动）
-            // 3. 若仍在平滑中，用当前值重新生成一次 Biquad 系数
-            // 4. 整块音频用同一组系数处理
-            // ============================================================
-
+            // =====================================================================
+            // Block‑wise parameter update logic
+            // 1. Read smoothed parameter values at the start of current audio block
+            // 2. Call skip() to advance smoother state to end of block (critical)
+            // 3. Re‑compute filter coefficients if smoothing is still in‑progress
+            // 4. Process entire audio block using one set of coefficients
+            // =====================================================================
             const int numSamples = buffer.getNumSamples();
-            // 步骤1：先记录当前块起始处是否还在平滑中
+            // Step 1: Check whether any parameter is still smoothing at block start
             const bool needUpdate = freqSmoother.isSmoothing() || qSmoother.isSmoothing();
-
-            // 步骤2：读取本块起始时刻的平滑参数值（只读，不推进状态）
+            // Step 2: Read values at block start (read‑only, does NOT advance state)
             const float fc = freqSmoother.getCurrentValue();
             const float q = qSmoother.getCurrentValue();
-
-            // 步骤3：推进平滑器内部状态，跨过当前音频块
-            // 等价于逐样本调用 numSamples 次 getNextValue()，
-            // 但开销极低
+            // Step 3: Advance smoother state across this whole block
+            // Equivalent to calling getNextValue() numSamples times, low‑overhead
             freqSmoother.skip(numSamples);
             qSmoother.skip(numSamples);
-
-            // 步骤4：只要当前块在开始处是需要平滑的，就更新系数
+            // Step 4: Update filter coefficients only if smoothing is active
             if (needUpdate) {
-                // 更新截止频率/中心频率
                 bandPassFilter.setCutoffFrequency(fc);
-                // 更新谐振/品质因子
                 bandPassFilter.setResonance(q);
             }
-            // 步骤5：处理整块音频（替换时处理，直接修改buffer）
+            // Step5: Process audio block in‑place, modify buffer contents
             juce::dsp::AudioBlock<float> block(buffer);
             bandPassFilter.process(juce::dsp::ProcessContextReplacing<float>(block));
         }
 
         void reset() {
-            // 重置滤波器内部延迟寄存器（清除历史样本残留，防止爆音）
+            // Clear filter delay states to remove leftover sample history, prevent audio clicks
             bandPassFilter.reset();
-            // 平滑器回到默认值（同时设置 current 和 target，无过渡）
+            // Reset smoothers to default values; set both current and target for instant jump without ramping
             freqSmoother.setCurrentAndTargetValue(defaultFreqCenter);
             qSmoother.setCurrentAndTargetValue(defaultQ);
             bandPassFilter.setCutoffFrequency(defaultFreqCenter);
@@ -87,8 +77,8 @@ namespace bandpass {
         }
 
         void setFreqCenter(const float freqCenter) noexcept {
-            // jlimit 做边界保护，然后直接交给平滑器作为目标值
-            // setTargetValue 内部会判断：新目标 == 旧目标则直接返回，不重置斜坡
+            // Clamp value to valid range, assign as smoother target value
+            // setTargetValue skips work internally if new target equals existing target
             freqSmoother.setTargetValue(
                 juce::jlimit(
                 minFreqCenter,
@@ -106,16 +96,16 @@ namespace bandpass {
 
     private:
         float sampleRate = defaultSampleRate;
-
-        // StateVariableTPTFilter：
-        // **State Variable**：状态可变滤波器（State-Variable Filter, SVF），一种经典的模拟滤波器拓扑
-        // **TPT**：**Topology-Preserving Transform**（拓扑保持变换）
+        // StateVariableTPTFilter
+        // State‑Variable Filter(SVF): classic analog filter topology
+        // TPT: Topology‑Preserving Transform, discrete‑time transformation method
         juce::dsp::StateVariableTPTFilter<float> bandPassFilter;
 
-        // 频率：乘法平滑（人耳对数感知，倍频程过渡时间一致）
-        // Q：线性平滑（人耳对 Q 的变化是线性感知）
-        // 平滑器内部已经保存了 target / current / 剩余步数，
-        // 不需要外部再写成员变量保存目标值或判断是否需要平滑。
+        // Frequency uses multiplicative smoothing:
+        // Consistent octave‑wise transition speed for logarithmic human pitch perception
+        // Q‑factor uses linear smoothing: human perception of Q‑change is linear
+        // Smoother internally stores target, current value and remaining interpolation steps.
+        // No extra member variables required to hold target or judge smoothing status.
         juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> freqSmoother;
         juce::SmoothedValue<float> qSmoother;
     };

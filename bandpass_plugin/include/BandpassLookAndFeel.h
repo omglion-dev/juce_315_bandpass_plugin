@@ -2,7 +2,7 @@
 
 namespace bandpass {
     // ============================================================
-    // 自定义 LookAndFeel：实现设计图中的蓝色发光水平滑块
+    // Custom LookAndFeel: implements styled glowing‑blue horizontal slider UI
     // ============================================================
     class BandpassLookAndFeel : public juce::LookAndFeel_V4 {
     public:
@@ -24,7 +24,8 @@ namespace bandpass {
 
         BandpassLookAndFeel();
 
-        // 绘制水平滑块：深色轨道+蓝色发光填充+白色圆形滑块头
+        // Draw horizontal slider:
+        // dark track background + glowing‑blue filled track + white circular slider thumb
         void drawLinearSlider(juce::Graphics &,
             int x, int y, int width, int height,
             float sliderPos,
@@ -32,7 +33,7 @@ namespace bandpass {
             juce::Slider::SliderStyle,
             juce::Slider &) override;
 
-        // 滑块布局：文本框在右侧
+        // Slider layout: position value text‑box on the right‑hand side
         juce::Slider::SliderLayout getSliderLayout(juce::Slider &) override;
 
         static juce::FontOptions getAxisFont();

@@ -6,7 +6,7 @@
 
 namespace bandpass {
     BandpassLookAndFeel::BandpassLookAndFeel() {
-        // 设置默认颜色
+        // Assign default colour values to LookAndFeel colour‑ids
         setColour(juce::Slider::backgroundColourId, getDefaultColour(Colors::sliderBackgroundColor));
         setColour(juce::Slider::trackColourId, getDefaultColour(Colors::sliderTrackColor));
         setColour(juce::Slider::thumbColourId, getDefaultColour(Colors::sliderThumbColor));
@@ -31,32 +31,32 @@ namespace bandpass {
         const auto trackH = 6.0f;
         const auto fillW = sliderPos - trackX;
 
-        // --- 轨道背景（深色圆角条）---
+        // --- Track background (dark rounded rectangle bar) ---
         g.setColour(getDefaultColour(Colors::sliderTrackBackgroundColor));
         g.fillRoundedRectangle(trackX, trackY, trackW, trackH, 3.0f);
 
-        // --- 已填充部分（蓝色发光）---
-        // 外层光晕：创建一个线性渐变对象glow
+        // --- Filled active section (blue glow effect) ---
+        // Outer glow: create linear gradient object for glow rendering
         juce::ColourGradient glow(
             juce::Colour(0x6600aaff), trackX, trackY + trackH * 0.5f,
             juce::Colour(0x0000aaff), sliderPos, trackY + trackH * 0.5f, false);
         g.setGradientFill(glow);
         g.fillRoundedRectangle(trackX, trackY - 2.0f, fillW, trackH + 4.0f, 3.0f);
 
-        // 核心亮条
+        // Inner bright core track bar
         g.setColour(juce::Colour(0xff00ccff));
         g.fillRoundedRectangle(trackX, trackY, fillW, trackH, 3.0f);
 
-        // --- 滑块头（白色圆形+蓝色光晕）---
+        // --- Slider thumb (white circle with surrounding blue radial glow) ---
         constexpr auto thumbR = 12.0f;
         const auto thumbX = sliderPos;
         const auto thumbY = trackY + trackH * 0.5f;
-        // 光晕
+        // Radial glow for thumb
         juce::ColourGradient thumbGlow(
-            juce::Colour(0x8800aaff),   // 圆心颜色
-            thumbX, thumbY,             // 圆心坐标
-            juce::Colour(0x0000aaff),   // 外圈边缘颜色
-            thumbX, thumbY +(thumbR + 8.0f),  // 渐变半径
+            juce::Colour(0x8800aaff),   // Gradient centre colour
+            thumbX, thumbY,             // Gradient centre point coordinates
+            juce::Colour(0x0000aaff),   // Outer edge colour of radial gradient
+            thumbX, thumbY +(thumbR + 8.0f),  // Point defining radial gradient radius
             true);
         g.setGradientFill(thumbGlow);
         g.fillEllipse(
@@ -65,7 +65,7 @@ namespace bandpass {
             (thumbR + 6.0f) * 2.0f,
             (thumbR + 6.0f) * 2.0f);
 
-        // 白色圆形
+        // Main white thumb circle
         g.setColour(getDefaultColour(Colors::sliderThumbColor));
         g.fillEllipse(
             thumbX - thumbR,
@@ -73,7 +73,7 @@ namespace bandpass {
             thumbR * 2.0f,
             thumbR * 2.0f);
 
-        // 圆形内部高光
+        // Inner highlight spot inside thumb circle
         g.setColour(getDefaultColour(Colors::sliderThumbHighlightColor));
         g.fillEllipse(
             thumbX - thumbR * 0.6f,
@@ -84,7 +84,7 @@ namespace bandpass {
 
     juce::Slider::SliderLayout BandpassLookAndFeel::getSliderLayout(juce::Slider & slider) {
         auto layout = juce::LookAndFeel_V4::getSliderLayout(slider);
-        // 文本框放在滑块右侧，宽度80
+        // Place value text‑box on slider right‑side, set width to 80 pixels
         layout.textBoxBounds = juce::Rectangle<int>(
             slider.getWidth() - 90,
             0,

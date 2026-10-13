@@ -4,10 +4,12 @@ namespace bandpass {
     namespace {
         auto& addParameterToProcessor(juce::AudioProcessor& processor,  auto&& parameter) {
             auto& parameterRef = *parameter;
-            // JUCE 要求由AudioProcessor 统一管理所有注册的参数实例，
-            // 即 AudioProcessor 会在插件销毁时自动删除所有注册的参数实例
-            // 所以，这里要先调用独占指针的release() 方法，
-            // 该方法会返回内部裸指针的解引用（T*），并将自身内部裸指针置空（nullptr）
+            // JUCE requires AudioProcessor to own all registered parameter instances.
+            // AudioProcessor will automatically delete all registered parameter instances
+            // on plugin destruction.
+            // Therefore we must call release() on the unique‑ptr first.
+            // release() returns dereferenced raw pointer (T*),
+            // and resets the internal raw pointer to nullptr.
             processor.addParameter(parameter.release());
             return parameterRef;
         }
